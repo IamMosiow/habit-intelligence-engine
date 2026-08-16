@@ -75,12 +75,12 @@ habit-intelligence-engine/
 
 ---
 
-## 🛡️ Privacy & Local Execution
+## Privacy & Local Execution
 
 [cite_start]This dashboard operates **100% locally and offline**[cite: 948, 993]. [cite_start]No personal activity, habit data, or health metrics are sent to third-party cloud servers[cite: 948, 993].
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
