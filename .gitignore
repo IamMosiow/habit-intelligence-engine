@@ -1,0 +1,22 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+
+# Personal habit logs / CSV data (Keep personal data private!)
+*.csv
+data/Activity entries*.csv
+
+# Streamlit local state
+.streamlit/
+
+# OS specific files
+.DS_Store
+Thumbs.db
