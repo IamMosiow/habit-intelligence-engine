@@ -36,7 +36,7 @@ st.markdown('<div class="sub-header">Life OS with Precision Sleep Duration Engin
 
 with st.sidebar:
     st.header("📂 Data Import & Controls")
-    uploaded_file = st.file_uploader("Upload updated tracking CSV", type=['csv'])
+    uploaded_file = st.file_uploader("Upload habit tracking CSV", type=['csv'])
     st.markdown("---")
     st.markdown("### 📅 Simulation Date")
     selected_date = st.date_input("Simulation Date", datetime.date.today())
@@ -73,12 +73,10 @@ def load_and_preprocess(file):
     ]
     df_core = df[df['Activity_clean'].isin(core_habits)].copy()
 
-    # Pivot tables
     df_val = df_core.pivot_table(index='Date_parsed', columns='Activity_clean', values='Value_num', aggfunc='first')
     df_state = df_core.pivot_table(index='Date_parsed', columns='Activity_clean', values='State', aggfunc='first')
     df_raw_val = df_core.pivot_table(index='Date_parsed', columns='Activity_clean', values='Value', aggfunc='first')
 
-    # Binary flags
     binary_cols = ['Wake up early', 'Sleep early', 'Morning Prayer', 'Night Prayer', 'No Soda', 'No J', 'Zekr']
     for col in binary_cols:
         if col in df_state.columns:
@@ -101,7 +99,6 @@ def load_and_preprocess(file):
         np.nan
     )
     
-    # Safe Fillna using pd.Series to prevent TypeError
     fallback_sleep = pd.Series(
         np.where(df_val.get('Sleep early_done', 0) == 1, 7.5, 6.0),
         index=df_val.index
@@ -142,7 +139,6 @@ if uploaded_file is not None:
     valid_history = df_proc.dropna(subset=['Mood At Night']).copy()
     valid_history = valid_history[valid_history['Mood At Night'] > 0]
 
-    # Pre-compute baselines
     recent_14 = valid_history.tail(14)
     recent_7 = valid_history.tail(7)
     yesterday_row = valid_history.iloc[-1]
@@ -164,12 +160,10 @@ if uploaded_file is not None:
     dow_ex_avg = same_weekday_df['Do Exercise'].mean() if len(same_weekday_df) > 0 else 20.0
     dow_eng_avg = same_weekday_df['English'].mean() if len(same_weekday_df) > 0 else 15.0
 
-    # Cognitive vs Physical Load Ratio (Burnout Index)
     cog_load_7 = recent_7['English'].mean() + recent_7['Book'].mean() * 3.0
     phys_load_7 = recent_7['Do Exercise'].mean()
     burnout_ratio = (cog_load_7 / (phys_load_7 + 1.0))
 
-    # Train Random Forest Regressor
     feature_cols = [c for c in valid_history.columns if c not in ['Mood At Night', 'DayName', 'Bedtime', 'Wake time']]
     X = valid_history[feature_cols].fillna(0)
     y = valid_history['Mood At Night']
@@ -177,7 +171,6 @@ if uploaded_file is not None:
     rf = RandomForestRegressor(n_estimators=100, random_state=42)
     rf.fit(X, y)
 
-    # Navigation Tabs
     tab_auto, tab_sim, tab_opt, tab_analytics = st.tabs([
         "🔮 Automated Recommendations", 
         "⚙️ Scenario Simulation & Recommendations", 
@@ -185,9 +178,7 @@ if uploaded_file is not None:
         "📈 Deep Analytics & Burnout Engine"
     ])
 
-    # =========================================================================
-    # TAB 1: AUTOMATED RECOMMENDATIONS (PASSIVE INTELLIGENCE)
-    # =========================================================================
+    # TAB 1: AUTOMATED RECOMMENDATIONS
     with tab_auto:
         st.markdown(f"## 🤖 Automated Life OS Recommendations for Today ({day_name})")
         st.caption("Generated automatically using exact sleep hours, 1-10 scaled mood baselines, and historical weekday patterns.")
@@ -255,9 +246,7 @@ if uploaded_file is not None:
             for r in auto_recs:
                 st.markdown(f'<div class="recommend-box">{r}</div>', unsafe_allow_html=True)
 
-    # =========================================================================
-    # TAB 2: INTERACTIVE SCENARIO SIMULATION & LIVE RECOMMENDATIONS
-    # =========================================================================
+    # TAB 2: INTERACTIVE SCENARIO SIMULATION
     with tab_sim:
         st.markdown("## ⚙️ Interactive Scenario Simulation (1-10 Scale & Precision Sleep)")
         st.caption("Adjust planned habit inputs below. The engine calculates real-time ML predictions and provides reactive optimization advice.")
@@ -471,9 +460,7 @@ Predicted Night Mood: {simulated_pred_mood:.1f} / 10.0
             mime="text/markdown"
         )
 
-    # =========================================================================
-    # TAB 3: TARGET GOAL SEEKER (INVERSE OPTIMIZATION)
-    # =========================================================================
+    # TAB 3: TARGET GOAL SEEKER
     with tab_opt:
         st.markdown("## 🎯 Target Goal Seeker (One-Click Habit Optimizer)")
         st.caption("Select your desired evening mood score (1-10). The optimizer will determine the minimum viable habit combination to achieve it.")
@@ -532,9 +519,7 @@ Predicted Night Mood: {simulated_pred_mood:.1f} / 10.0
             else:
                 st.warning("Could not reach that target with standard routine. Try ensuring optimal sleep duration and morning baseline first.")
 
-    # =========================================================================
     # TAB 4: DEEP ANALYTICS & BURNOUT ENGINE
-    # =========================================================================
     with tab_analytics:
         st.markdown("## 📈 Deep Analytics, Burnout Engine & Historical Trends")
 
