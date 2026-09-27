@@ -22,16 +22,18 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] { height: 50px; white-space: pre-wrap; background-color: #F0F4F8; border-radius: 8px 8px 0px 0px; padding-left: 20px; padding-right: 20px; font-weight: 600; }
     .stTabs [aria-selected="true"] { background-color: #1E88E5 !important; color: white !important; }
+    
     .insight-card { background-color: #FFFFFF; border-radius: 12px; padding: 18px; border: 1px solid #E0E0E0; box-shadow: 0 4px 6px rgba(0,0,0,0.04); margin-bottom: 15px; }
     .warning-box { background-color: #FFF3E0; border-radius: 10px; padding: 14px; border-left: 6px solid #FF9800; margin-bottom: 12px; color: #8C3B00; font-size: 0.95rem; }
     .success-box { background-color: #E8F5E9; border-radius: 10px; padding: 14px; border-left: 6px solid #4CAF50; margin-bottom: 12px; color: #1B5E20; font-size: 0.95rem; }
     .info-box { background-color: #E3F2FD; border-radius: 10px; padding: 14px; border-left: 6px solid #2196F3; margin-bottom: 12px; color: #0D47A1; font-size: 0.95rem; }
     .recommend-box { background-color: #F3E5F5; border-radius: 10px; padding: 14px; border-left: 6px solid #9C27B0; margin-bottom: 12px; color: #4A148C; font-size: 0.95rem; }
+    .recovery-box { background-color: #FFEBEE; border-radius: 10px; padding: 14px; border-left: 6px solid #F44336; margin-bottom: 12px; color: #B71C1C; font-size: 0.95rem; }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-header">🧠 Personal Habit Intelligence Engine</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Life OS with Precision Sleep Analytics, Weekly Velocity Tracking & Automated Prescriptions</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Life OS with Dynamic Recovery Mode, Reality-Aware Goal Seeker & Burnout Protection</div>', unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("📂 Data Import & Controls")
@@ -99,7 +101,6 @@ def load_and_preprocess(file):
         np.nan
     )
     
-    # Safe Fillna to prevent TypeError
     fallback_sleep = pd.Series(
         np.where(df_val.get('Sleep early_done', 0) == 1, 7.5, 6.0),
         index=df_val.index
@@ -174,7 +175,10 @@ if uploaded_file is not None:
     days_in_last_30 = len(valid_history[valid_history.index >= (valid_history.index.max() - pd.Timedelta(days=30))])
     consistency_rate = min((days_in_last_30 / 30.0) * 100, 100)
 
-    # Train Model (Robust to missing features)
+    # State check: Is the user feeling unwell? (Score <= 6.5)
+    is_recovery_mode_auto = yesterday_row.get('Mood In Morning', 8.0) <= 6.5 or yesterday_row.get('Mood At Night', 8.0) <= 6.5
+
+    # Train Model
     feature_cols = [c for c in valid_history.columns if c not in ['Mood At Night', 'DayName', 'Bedtime', 'Wake time']]
     X = valid_history[feature_cols].fillna(0)
     y = valid_history['Mood At Night']
@@ -207,16 +211,19 @@ if uploaded_file is not None:
         y_sleep_hours = yesterday_row.get('Sleep_Duration_Hours', 7.5)
         if y_sleep_hours < 6.0:
             auto_warnings.append(f"⚠️ **Sleep Deficit**: Only **{y_sleep_hours:.1f} hours** of sleep last night.")
-        if curr_ex_streak >= 3 and yesterday_row.get('Do Exercise', 0) == 0:
+        
+        # Only issue streak threats if NOT in recovery mode
+        if not is_recovery_mode_auto and curr_ex_streak >= 3 and yesterday_row.get('Do Exercise', 0) == 0:
             auto_warnings.append(f"⚠️ **Streak Threat**: Your {curr_ex_streak}-day workout streak is at risk.")
-        if yesterday_row.get('Mood In Morning', 8.0) < base_m_mood - 1.5:
-            auto_warnings.append("⚠️ **Morning Energy Dip**: Morning mood is below your 7-day baseline.")
-        if burnout_ratio > 2.5:
-            auto_warnings.append(f"🧠 **Burnout Alert (Index {burnout_ratio:.1f})**: Mental load exceeds physical recovery.")
+            
+        if burnout_ratio > 2.5 and not is_recovery_mode_auto:
+            auto_warnings.append(f"🧠 **Burnout Alert**: Mental load heavily exceeds physical recovery. Prioritize rest or light exercise.")
 
         with auto_w:
             st.subheader("🚨 Risk Alerts")
-            if auto_warnings:
+            if is_recovery_mode_auto:
+                st.markdown('<div class="recovery-box">🩺 **Recovery Mode Active**: You recently logged a low mood score. All streak warnings and productivity threats are paused. Focus on your health today.</div>', unsafe_allow_html=True)
+            elif auto_warnings:
                 for w in auto_warnings:
                     st.markdown(f'<div class="warning-box">{w}</div>', unsafe_allow_html=True)
             else:
@@ -227,7 +234,7 @@ if uploaded_file is not None:
             auto_positives.append(f"📈 **Health Velocity**: Physical health is actively trending up (+{delta_health:.1f} vs last week).")
         if y_sleep_hours >= 7.5:
             auto_positives.append(f"🌙 **Optimal Sleep**: You secured **{y_sleep_hours:.1f}h** of sleep.")
-        if curr_ex_streak >= 3:
+        if curr_ex_streak >= 3 and not is_recovery_mode_auto:
             auto_positives.append(f"🔥 **Exercise Multiplier**: You are on a {curr_ex_streak}-day workout streak!")
 
         with auto_p:
@@ -236,14 +243,19 @@ if uploaded_file is not None:
                 for p in auto_positives:
                     st.markdown(f'<div class="success-box">{p}</div>', unsafe_allow_html=True)
             else:
-                st.markdown('<div class="info-box">💡 Complete workout goals to trigger multipliers.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="info-box">💡 Focus on basic recovery and sleep to rebuild momentum.</div>', unsafe_allow_html=True)
 
         auto_recs = []
-        auto_recs.append(f"📅 **{day_name} Benchmark**: Target **{dow_ex_avg:.0f} mins** of exercise today.")
+        if is_recovery_mode_auto:
+            auto_recs.append("🩺 **Rest is Progress**: It is completely fine to break a streak today. Your only goals are hydration and deep sleep.")
+            auto_recs.append("💧 **Hydration Focus**: Ensure you get 8+ glasses of water today.")
+        else:
+            auto_recs.append(f"📅 **{day_name} Benchmark**: Target **{dow_ex_avg:.0f} mins** of exercise today.")
+            if day_name == 'Wednesday':
+                auto_recs.append("🎯 **Wednesday Shield**: Lock in 15+ minutes of book reading early in the day to counter mid-week slump.")
+        
         if y_sleep_hours < 6.0:
             auto_recs.append("🎯 **Sleep Debt Recovery**: Plan a bedtime before 23:30 tonight.")
-        if curr_ex_streak >= 3 and yesterday_row.get('Do Exercise', 0) == 0:
-            auto_recs.append("🎯 **Streak Protector**: Do a quick 10-minute walk today.")
 
         with auto_r:
             st.subheader(f"💡 Recommended Plan")
@@ -336,30 +348,41 @@ if uploaded_file is not None:
         with m3:
             st.metric("7-Day Baseline Mood", f"{base_m_mood:.1f} / 10.0")
 
-        # Reactive Tips
+        # RECOVERY MODE CHECK FOR SIMULATION
+        is_recovery_sim = plan_m_mood <= 6.5
+
         st.markdown("---")
         st.subheader("💡 Reactive Sensitivities")
         r1, r2 = st.columns(2)
         
         with r1:
-            if plan_exercise < 30:
-                test_df = scenario_df.copy()
-                test_df['Do Exercise'] += 15
-                bump = rf.predict(test_df)[0] - simulated_pred_mood
-                if bump > 0.05:
-                    st.markdown(f'<div class="recommend-box">💡 **Exercise ROI**: +15 mins exercise = **+{bump:.2f} predicted mood**.</div>', unsafe_allow_html=True)
-            if plan_english < 20:
-                test_df = scenario_df.copy()
-                test_df['English'] += 15
-                bump = rf.predict(test_df)[0] - simulated_pred_mood
-                if bump > 0.05:
-                    st.markdown(f'<div class="info-box">📚 **Study ROI**: +15 mins English = **+{bump:.2f} predicted mood**.</div>', unsafe_allow_html=True)
+            if is_recovery_sim:
+                st.markdown('<div class="recovery-box">🩺 **Recovery Protocol Engaged**: Your morning mood is low. Standard productivity targets are muted.</div>', unsafe_allow_html=True)
+                if plan_exercise > 0:
+                    st.markdown('<div class="info-box">💡 **Rest over Streaks**: You planned exercise, but it is entirely okay to change this to 0 mins to recover your baseline.</div>', unsafe_allow_html=True)
+                if plan_english > 0 or plan_book > 0:
+                    st.markdown('<div class="info-box">🧠 **Cognitive Rest**: Keep mental load light today. Skip heavy English or reading if you feel exhausted.</div>', unsafe_allow_html=True)
+            else:
+                if plan_exercise < 30:
+                    test_df = scenario_df.copy()
+                    test_df['Do Exercise'] += 15
+                    bump = rf.predict(test_df)[0] - simulated_pred_mood
+                    if bump > 0.05:
+                        st.markdown(f'<div class="recommend-box">💡 **Exercise ROI**: +15 mins exercise = **+{bump:.2f} predicted mood**.</div>', unsafe_allow_html=True)
+                if plan_english < 20:
+                    test_df = scenario_df.copy()
+                    test_df['English'] += 15
+                    bump = rf.predict(test_df)[0] - simulated_pred_mood
+                    if bump > 0.05:
+                        st.markdown(f'<div class="info-box">📚 **Study ROI**: +15 mins English = **+{bump:.2f} predicted mood**.</div>', unsafe_allow_html=True)
 
         with r2:
             if calc_sleep_dur < 6.0:
-                st.markdown('<div class="warning-box">⚠️ **Sleep Deficit**: Planned sleep is low. Prioritize rest.</div>', unsafe_allow_html=True)
-            if plan_exercise < dow_ex_avg:
+                st.markdown('<div class="warning-box">⚠️ **Sleep Deficit**: Planned sleep is low. Prioritize rest tonight.</div>', unsafe_allow_html=True)
+            if not is_recovery_sim and plan_exercise < dow_ex_avg:
                 st.markdown(f'<div class="recommend-box">📅 **{day_name} Benchmark**: You are below your usual {day_name} exercise average ({dow_ex_avg:.0f}m).</div>', unsafe_allow_html=True)
+            if is_recovery_sim:
+                st.markdown(f'<div class="success-box">💧 **Nourishment Focus**: Hydration ({plan_water} glasses) and high dinner quality ({plan_dinner}/10) are your only real goals today.</div>', unsafe_allow_html=True)
 
         # Plan Summary Export
         st.markdown("---")
@@ -373,35 +396,79 @@ Predicted Mood: {simulated_pred_mood:.1f} / 10.0
         st.download_button("📥 Download Checklist (.md)", data=checklist_text, file_name=f"Plan_{selected_date.strftime('%Y-%m-%d')}.md")
 
     # =========================================================================
-    # TAB 3: GOAL SEEKER
+    # TAB 3: REALITY-AWARE GOAL SEEKER
     # =========================================================================
     with tab_opt:
-        st.markdown("## 🎯 Target Goal Seeker")
-        target_score = st.slider("Desired Evening Mood (1-10)", 7.0, 10.0, 8.8, 0.1)
+        st.markdown("## 🎯 Reality-Aware Goal Seeker")
+        st.caption("Select your desired evening mood score. If you are unwell, the optimizer automatically adjusts to find the best possible realistic outcome.")
+
+        target_score = st.slider("Desired Evening Mood (1-10)", 6.0, 10.0, 8.5, 0.1)
 
         if st.button("🚀 Find Optimal Habit Plan"):
-            best_plan, min_effort = None, 999999
+            best_target_plan = None
+            best_max_plan = None
+            max_possible_mood = -1
+            min_effort = 999999
+            
+            # If morning mood is low, penalize heavy physical/mental effort heavily in the solver
+            is_sick = plan_m_mood <= 6.5
+
             for ex_val in [0, 15, 30, 45, 60]:
                 for eng_val in [0, 15, 30, 45]:
                     for din_val in [7.0, 8.5, 10.0]:
-                        test_dict = yesterday_row[feature_cols].to_dict()
-                        test_dict.update({'Mood In Morning': base_m_mood, 'Do Exercise': ex_val, 'English': eng_val, 'Dinner Quality': din_val, 'Sleep_Duration_Hours': 7.5, 'DayOfWeek': sim_dow_num})
-                        t_df = pd.DataFrame([test_dict]).reindex(columns=feature_cols, fill_value=0)
-                        p_mood = rf.predict(t_df)[0]
-                        if p_mood >= target_score - 0.15:
-                            effort = ex_val + eng_val
-                            if effort < min_effort:
-                                min_effort = effort
-                                best_plan = {'Exercise': ex_val, 'English': eng_val, 'Dinner': din_val, 'Mood': p_mood}
+                        for bk_val in [0, 5, 15]:
+                            test_dict = yesterday_row[feature_cols].to_dict()
+                            test_dict.update({
+                                'Mood In Morning': plan_m_mood,
+                                'Physical Health': plan_health,
+                                'Do Exercise': ex_val,
+                                'English': eng_val,
+                                'Book': bk_val,
+                                'Dinner Quality': din_val,
+                                'Lunch Quality': 8.0,
+                                'Sleep_Duration_Hours': 7.5,
+                                'Sleep early_done': 1,
+                                'Wake up early_done': 1,
+                                'DayOfWeek': sim_dow_num
+                            })
+                            t_df = pd.DataFrame([test_dict]).reindex(columns=feature_cols, fill_value=0)
+                            p_mood = rf.predict(t_df)[0]
+                            
+                            # Track absolute maximum achievable mood
+                            if p_mood > max_possible_mood:
+                                max_possible_mood = p_mood
+                                best_max_plan = {'Exercise': ex_val, 'English': eng_val, 'Book': bk_val, 'Dinner': din_val, 'Predicted Mood': p_mood}
 
-            if best_plan:
-                st.success(f"🎯 **Plan Found!** Expected Mood: **{best_plan['Mood']:.1f} / 10.0**")
-                o1, o2, o3 = st.columns(3)
-                o1.metric("Exercise", f"{best_plan['Exercise']} min")
-                o2.metric("English", f"{best_plan['English']} min")
-                o3.metric("Dinner Quality", f"{best_plan['Dinner']:.1f}/10")
+                            # Track minimum effort to reach user target
+                            if p_mood >= target_score - 0.15:
+                                if is_sick:
+                                    # Penalize effort heavily if sick so the solver prefers 0 exercise
+                                    effort = (ex_val * 3) + (eng_val * 2) + (bk_val * 2)
+                                else:
+                                    effort = ex_val + eng_val + (bk_val * 2)
+                                    
+                                if effort < min_effort:
+                                    min_effort = effort
+                                    best_target_plan = {'Exercise': ex_val, 'English': eng_val, 'Book': bk_val, 'Dinner': din_val, 'Predicted Mood': p_mood}
+
+            if best_target_plan:
+                st.success(f"🎯 **Optimal Minimum Plan Found!** Expected Evening Mood: **{best_target_plan['Predicted Mood']:.1f} / 10.0**")
+                o1, o2, o3, o4 = st.columns(4)
+                o1.metric("Exercise Required", f"{best_target_plan['Exercise']} min")
+                o2.metric("English Study Required", f"{best_target_plan['English']} min")
+                o3.metric("Book Reading Required", f"{best_target_plan['Book']} pages")
+                o4.metric("Dinner Quality Target", f"{best_target_plan['Dinner']:.1f}/10")
+                if best_target_plan['Exercise'] == 0 and is_sick:
+                    st.info("🩺 The optimizer correctly determined that keeping exercise at 0 mins minimizes effort while you recover.")
             else:
-                st.warning("Could not reach target. Ensure morning baseline is strong.")
+                st.warning(f"⚠️ Your target of {target_score} is mathematically out of reach today due to your morning baseline ({plan_m_mood:.1f}/10).")
+                st.info(f"However, here is the absolute BEST realistic plan to reach the maximum possible score of **{max_possible_mood:.1f} / 10.0**:")
+                
+                o1, o2, o3, o4 = st.columns(4)
+                o1.metric("Optimal Exercise", f"{best_max_plan['Exercise']} min")
+                o2.metric("Optimal English", f"{best_max_plan['English']} min")
+                o3.metric("Optimal Reading", f"{best_max_plan['Book']} pages")
+                o4.metric("Dinner Quality Requirement", f"{best_max_plan['Dinner']:.1f}/10")
 
     # =========================================================================
     # TAB 4: ANALYTICS
